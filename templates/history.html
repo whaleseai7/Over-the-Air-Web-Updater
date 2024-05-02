@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Riwayat Pembaruan Firmware</title>
+    <link href="{{ url_for('static', filename='css/bootstrap.min.css') }}" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" rel="stylesheet">
+    <style>
+        body {
+            background-color: #f8f9fa;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            color: #495057;
+            margin: 0;
+            padding: 0;
+        }
+
+        .header-container {
+            background: linear-gradient(90deg, #343a40 0%, #4b5257 100%);
+            color: #ffffff;
+            text-align: center;
+            padding: 3rem 0;
+            margin-bottom: 1rem;
+        }
+
+        .header-title {
+            font-size: 3rem;
+            font-weight: bold;
+            margin-bottom: 0.5rem;
+        }
+
+        h1 {
+            font-size: 2rem;
+            margin-bottom: 1.5rem;
+        }
+
+        ul {
+            list-style-type: none;
+            padding: 0;
+        }
+
+        li {
+            margin-bottom: 1rem;
+            padding: 1rem;
+            background-color: #ffffff;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        form {
+            display: flex;
+            align-items: center;
+        }
+
+        button {
+            padding: 0.5rem 1rem;
+            background-color: #dc3545;
+            color: #ffffff;
+            border: none;
+            border-radius: 3px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+
+        button:hover {
+            background-color: #c82333;
+        }
+        
+        main {
+            padding: 2rem;
+        }
+
+        table {
+            border-collapse: collapse;
+            width: 100%;
+        }
+
+        th, td {
+            border: 1px solid #dddddd;
+            text-align: center;
+            padding: 8px;
+            vertical-align: middle;
+        }
+
+        th {
+            background-color: #f2f2f2;
+        }
+
+        tr:nth-child(even) {
+            background-color: #f2f2f2;
+        }
+
+        tr:hover {
+            background-color: #ddd;
+        }
+
+        .delete-button-container {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            z-index: 999; /* Atur z-index sesuai kebutuhan */
+        }
+    </style>
+    <script>
+        function selectAll() {
+            var checkboxes = document.getElementsByName('checklist');
+            var selectAllButton = document.getElementById('selectAllButton');
+            var allChecked = true;
+    
+            for (var i = 0; i < checkboxes.length; i++) {
+                if (!checkboxes[i].checked) {
+                    allChecked = false;
+                    break;
+                }
+            }
+    
+            for (var i = 0; i < checkboxes.length; i++) {
+                checkboxes[i].checked = !allChecked;
+            }
+    
+            selectAllButton.innerText = allChecked ? 'PILIH SEMUA' : 'BATALKAN';
+        }
+
+        function deleteSelected() {
+            var checkboxes = document.getElementsByName('checklist');
+            var entriesToDelete = [];
+
+            for (var i = 0; i < checkboxes.length; i++) {
+                if (checkboxes[i].checked) {
+                    entriesToDelete.push(checkboxes[i].value);
+                }
+            }
+
+            if (entriesToDelete.length > 0) {
+                var confirmation = confirm("Apakah Anda yakin ingin menghapus perangkat dan riwayat pembaruan firmware yang terkait?");
+                if (confirmation) {
+                    fetch('/delete_selected', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ entriesToDelete: entriesToDelete })
+                    })
+                    .then(response => {
+                        if (response.ok) {
+                            // Refresh halaman setelah penghapusan berhasil
+                            window.location.reload();
+                        } else {
+                            // Tampilkan pesan kesalahan jika penghapusan gagal
+                            console.error('Failed to delete entries');
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error:', error);
+                    });
+                }
+            } else {
+                // Tampilkan pesan alert jika tidak ada entri yang dipilih
+                alert("Pilih setidaknya satu entri untuk dihapus.");
+            }
+        }
+    </script>
+</head>
+<body>
+    <header class="container-fluid header-container">
+        <h1 class="header-title">Riwayat Pembaruan Perangkat {{ device.mac_address }}</h1>
+    </header>
+
+    <main>
+        <div class="table-container">
+            <!-- Tabel firmware history -->
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>TANGGAL</th>
+                        <th>WAKTU</th>
+                        <th>NAMA BERKAS</th>
+                        <th>VERSI FIRMWARE</th>                        
+                        <th style="width: 150px;">AKSI</th>
+                        <th style="width: 150px;"><button id="selectAllButton" class="btn btn-primary btn-sm" onclick="selectAll()" style="font-weight: bold;">PILIH SEMUA</button></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for entry in history_entries %}
+                        <tr>
+                            <td>{{ entry.timestamp.strftime('%Y-%m-%d') }}</td>
+                            <td>{{ entry.timestamp.strftime('%I:%M:%S %p') }}</td>
+                            <td>{{ entry.file_name }}</td>
+                            <td>{{ extract_version_from_filename(entry.file_name) }}</td>
+                            <td style="width: 150px;">
+                                <a href="{{ url_for('download_firmware', entry_id=entry.id) }}" class="btn btn-success btn-sm" style="font-weight: bold;">
+                                    <i class="fas fa-cloud-download-alt"></i> UNDUH
+                                </a>
+                            </td>
+                            <td style="width: 150px;">
+                                <input type="checkbox" name="checklist" value="{{ entry.id }}">
+                            </td>                            
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <div class="delete-button-container">
+            <button id="deleteSelectedButton" class="btn btn-outline-danger" onclick="deleteSelected()" style="font-weight: bold;">
+                <i class="fas fa-trash"></i> HAPUS RIWAYAT
+            </button>
+        </div>
+    </main>
+</body>
+</html>

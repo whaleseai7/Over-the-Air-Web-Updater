@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Daftar Perangkat</title>
+    <link href="{{url_for('static', filename='css/bootstrap.min.css')}}" rel="stylesheet"/>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" rel="stylesheet">
+    <style>
+        body {
+            background-color: #f8f9fa;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            color: #495057;
+            margin: 0;
+            padding: 0;
+        }
+
+        .header-container {
+            background: linear-gradient(90deg, #343a40 0%, #4b5257 100%);
+            color: #ffffff;
+            text-align: center;
+            padding: 3rem 0;
+            margin-bottom: 1rem;
+        }
+
+        .header-title {
+            font-size: 3rem;
+            font-weight: bold;
+            margin-bottom: 0.5rem;
+        }
+
+        h1 {
+            font-size: 2rem;
+        }
+
+        main {
+            padding: 2rem;
+        }
+
+        ul {
+            list-style-type: none;
+            padding: 0;
+        }
+
+        li {
+            margin-bottom: 1rem;
+            padding: 1rem;
+            background-color: #ffffff;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        form {
+            display: flex;
+            flex-direction: row;
+            align-items: flex-start;
+            flex-wrap: wrap;
+        }
+
+        label {
+            margin-bottom: 0.5rem;
+            display: block;
+            width: 100%;
+        }
+
+        input {
+            margin-bottom: 1rem;
+            padding: 0.5rem;
+            border: 1px solid #ced4da;
+            border-radius: 3px;
+            flex: 1; 
+            margin-right: 10px; 
+        }
+
+        button {
+            padding: 0.5rem 1rem;
+            background-color: #28a745;
+            color: #ffffff;
+            border: none;
+            border-radius: 3px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+
+        .form-group {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            margin-top: 1rem;
+        }
+
+        table {
+            border-collapse: collapse;
+            width: 100%;
+        }
+
+        th, td {
+            border: 1px solid #dddddd;
+            text-align: center;
+            padding: 8px;
+            vertical-align: middle;
+        }
+
+        th {
+            background-color: #f2f2f2;            
+        }
+
+        tr:nth-child(even) {
+            background-color: #f2f2f2;
+        }
+
+        tr:hover {
+            background-color: #ddd;
+        }
+    </style>
+    <script>
+        function selectAll() {
+            var checkboxes = document.getElementsByName('checklist');
+            var selectAllButton = document.getElementById('selectAllButton');
+            var allChecked = true;
+
+            for (var i = 0; i < checkboxes.length; i++) {
+                if (!checkboxes[i].checked) {
+                    allChecked = false;
+                    break;
+                }
+            }
+
+            for (var i = 0; i < checkboxes.length; i++) {
+                checkboxes[i].checked = !allChecked;
+            }
+
+            selectAllButton.innerText = allChecked ? 'PILIH SEMUA' : 'BATALKAN';
+        }
+        
+        function updateSelectedDevices() {
+            var checkboxes = document.getElementsByName('checklist');
+            var selectedDevices = [];
+
+            for (var i = 0; i < checkboxes.length; i++) {
+                if (checkboxes[i].checked) {
+                    selectedDevices.push(checkboxes[i].value);
+                }
+            }
+
+            document.getElementById('selectedDevices').value = JSON.stringify(selectedDevices);
+        }
+
+        function deleteSelectedDevices() {
+            var checkboxes = document.getElementsByName('checklist');
+            var selectedDevices = [];
+
+            for (var i = 0; i < checkboxes.length; i++) {
+                if (checkboxes[i].checked) {
+                    selectedDevices.push(checkboxes[i].value);
+                }
+            }
+
+            if (selectedDevices.length > 0) {
+                var confirmation = confirm("Apakah Anda yakin ingin menghapus perangkat dan riwayat pembaruan firmware yang terkait?");
+                if (confirmation) {
+                    var xhr = new XMLHttpRequest();
+                    xhr.open("POST", "/delete_device", true);
+                    xhr.setRequestHeader("Content-Type", "application/json");
+                    xhr.onreadystatechange = function () {
+                        if (xhr.readyState === 4 && xhr.status === 200) {
+                            // Refresh halaman setelah penghapusan berhasil
+                            location.reload(true);
+                        }
+                    };
+                    xhr.send(JSON.stringify({ devicesToDelete: selectedDevices }));
+                }
+            } else {
+                alert("Pilih setidaknya satu perangkat untuk dihapus.");
+            }
+        }
+    </script>    
+</head>
+<body>
+    <header class="container-fluid header-container">
+        <h1 class="header-title">Perangkat Terdaftar</h1>
+    </header>
+
+    <main>
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>MAC ADDRESS</th>
+                    <th>LABEL</th>
+                    <th>AKSI</th>
+                    <th style="width: 150px;"><button id="selectAllButton" class="btn btn-primary btn-sm" onclick="selectAll()" style="font-weight: bold;">PILIH SEMUA</button></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for device in devices %}
+                    <tr>
+                        <td>{{ device.mac_address }}</td>
+                        <td>{{ device.label }}</td>
+                        <td style="width: 300px;">
+                            <!-- Tombol Riwayat Pembaruan -->
+                            <form action="{{ url_for('firmware_history') }}" method="get" style="display: inline;">
+                                <input type="hidden" name="mac_address" value="{{ device.mac_address }}">
+                                <button type="submit" class="btn btn-info btn-sm text-white" style="font-weight: bold;">
+                                    <i class="fas fa-history"></i> RIWAYAT PEMBARUAN
+                                </button>
+                            </form>                                                      
+                        </td>
+                        <td style="width: 150px;">
+                            <input type="checkbox" name="checklist" value="{{ device.mac_address }}"> <!-- Checkbox for each device -->
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>        
+
+        <form action="/upload" method="post" enctype="multipart/form-data">
+            <input type="hidden" id="selectedDevices" name="selectedDevices" value="">
+
+            <label for="firmware_upload" class="form-label" style="font-weight: bold;">UNGGAH BERKAS</label>
+            <input type="file" id="firmware_upload" name="firmware" accept=".bin" required><br>
+        
+            <button type="submit" class="btn btn-success" onclick="updateSelectedDevices()" style="margin-right: 8px; font-weight: bold;">
+                <i class="fas fa-sync-alt"></i> PERBARUI PERANGKAT
+            </button>
+            <button type="button" class="btn btn-danger" onclick="deleteSelectedDevices()" style="font-weight: bold;">
+                <i class="fas fa-trash"></i> HAPUS PERANGKAT
+            </button>
+        </form>
+    </main>
+</body>
+</html>
